@@ -8,7 +8,7 @@ from django.urls import reverse
 from django.http import HttpResponse, JsonResponse
 from .forms import MyShortCutForm_input, SkilNoteForm, MyShortCutForm_image, MyShortCutForm_summer_note2, InsertFormForOhterUserNote
 from accounts2.models import Profile
-from .models import MyShortCut, Type, Category, CategoryNick, CommentForShortCut, TempMyShortCut, TempMyShortCutForBackEnd, CommentForShortCut, RecommandationUserAboutSkillNote, CommentForPage, GuestBook, AllowListForSkilNote
+from .models import MyShortCut, Type, Category, CategoryNick, CommentForShortCut, TempMyShortCut, TempMyShortCutForBackEnd, CommentForShortCut, RecommandationUserAboutSkillNote, CommentForPage, LectureBookMark, AllowListForSkilNote, MyPlan, LectureBookMark, CommonSubject
 from skilblog.models import SkilBlogTitle, SkilBlogContent
 from django.http import HttpResponseRedirect
 from datetime import datetime, timedelta
@@ -18,76 +18,673 @@ from . forms import CommentForm
 from django.utils.datastructures import MultiValueDictKeyError
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 
-# 11111111
-# <str:guest_book_owner>
-# self.kwargs['owner']
+# 11111111111111111111
 
-    # bids = models.Bids(id=id, owner=request.user,
-    #                            biddedschedule=biddedschedule)
-    # bids.save()
+def partial_copy_for_skilnote_from_another_user(request):
+    # print("hi")
+    partial_copy_option = request.POST['partial_copy_option']
+    writer_start = request.POST['writer_start']
+    writer_end = request.POST['writer_end']
+    user_start = request.POST['user_start']
+    user_end = request.POST['user_end']
+    writer_name = request.POST['writer_name'].strip()
+    
+    print("writer_name : ", writer_name)
+
+    user_count = User.objects.filter(username=writer_name).count()
+    if(user_count != 0):
+        note_ower_obj = User.objects.get(username=writer_name)
+        print("note_ower_obj : ", note_ower_obj)
+    else:
+        return JsonResponse({
+            'message': "아이디가 존재하지 않습니다.",
+            })        
+        
+    if(partial_copy_option == "replace" and writer_name != request.user.username):
+        if (MyShortCut.objects.filter(Q(author=request.user)).count() != 0):
+            MyShortCut.objects.filter(Q(author=request.user)).delete()
+            # CategoryNick.objects.filter(Q(author=request.user)).delete()
+            CommentForShortCut.objects.filter(Q(author=request.user)).delete()
+    elif(partial_copy_option =="add"):
+        print("노트 부분 복사 실행")
+    else:
+        return JsonResponse({
+            'message': "본인의 노트는 replace 할수 없습니다.",
+            })                 
+
+
+    print("partial rang : ", writer_start, writer_end, user_start, user_end)
+
+    writer_array = [i for i in range(int(writer_start), int(writer_end) + 1)]    
+    user_array = [i for i in range(int(user_start), int(user_end) + 1)]
+    
+    min_writer_ca_num = int(writer_array[0])
+    min_user_ca_num = int(user_array[0])
+    distance = min_writer_ca_num - min_user_ca_num
+    
+    # distance = int(writer_array[0]) - int(user_array[0])
+    ca_array = ["ca"+str(i) for i in range(int(writer_start), int(writer_end) + 1)]
+    
+    print("writer_array : ", writer_array)
+    print("user_array : ", user_array)
+    print("writer_name : ", writer_name)
+    # print("ca_array : ", ca_array)
+
+    # CategoryNick.objects.filter(Q(author=request.user)).delete()
+
+    category_list_obj = CategoryNick.objects.filter(Q(author=note_ower_obj))
+    print("category_list_obj : ", category_list_obj)
+    
+    for ca in ca_array:   
+        ca_obj = CategoryNick.objects.get(Q(author=note_ower_obj))
+        category_title = getattr(ca_obj, ca)                       
+        print("category_title : ", category_title)
+        print("count : ", CategoryNick.objects.filter(Q(author=request.user)).count())
+        
+        original_ca_num = int(ca[2:5])
+        # print("writer_note_obj : ", writer_note_obj)
+        # print("check !!!!!!!!!!!! : " , note.category.slug[2:5])
+        print("distance ::::::::::::::::::::::::: ", distance)
+        
+        ca_for_update1 = "ca"+str(original_ca_num)  
+        ca_for_update = "ca"+str(original_ca_num -  distance)  
+        
+        print("ca_for_update 5555555555555555555555555 ", ca_for_update)    
+
+        result_for_ca_update1 = CategoryNick.objects.filter(Q(author=request.user.id)).update(**{ca_for_update1: ca_for_update1})        
+        result_for_ca_update2 = CategoryNick.objects.filter(Q(author=request.user.id)).update(**{ca_for_update: category_title})        
+        print("result_for_ca_update2 : ", result_for_ca_update2)
+
+    writer_comment_list_obj = CommentForShortCut.objects.filter(
+        Q(author=note_ower_obj.id))
+    print("writer_comment_list_obj : ", writer_comment_list_obj.count())
+
+    for ca_id in writer_array:
+        print(ca_id)
+        writer_note_obj = MyShortCut.objects.filter(category=ca_id, author=note_ower_obj).order_by('created')
+
+        # [1,2] => [3,4]
+        # [3,4] => [1,2]
+        for note in writer_note_obj:
+            original_ca_num = int(note.category.slug[2:5])
+            print("writer_note_obj : ", writer_note_obj)
+            print("check !!!!!!!!!!!! : " , note.category.slug[2:5])
+            print("distance ::::::::::::::::::::::::: ", distance)
+            ca_number_for_update = original_ca_num -  distance
+            ca_obj_for_create = Category.objects.get(slug="ca"+str(ca_number_for_update)) # 차이만큼 빼준 category 를 적용
+            # if(distance > 0 ):  # 기존 카테고리가 더 클 경우 
+            # else: # 반대일 경우 즉 distance 가 - 일 경우 
+            #     ca_number_for_update = original_ca_num -  distance
+            #     print("ca_number_for_update check 2222222222222222222222222222222222: ", ca_number_for_update)
+            #     ca_obj_for_create = Category.objects.get(slug="ca"+str(ca_number_for_update))                   
+            
+            print("ca_obj_for_create : ", ca_obj_for_create)
+            myshortcut = MyShortCut.objects.create(
+                author=request.user,
+                title=note.title,
+                content1=note.content1,
+                content2=note.content2,
+                type_id=note.type_id,
+                category=ca_obj_for_create,
+                filename=note.filename,
+                image=note.image,
+                created=note.created,
+            )
+            for comment in writer_comment_list_obj:
+                if comment.shortcut.id == note.id:
+                    # print("댓글 생성 시도 확인")
+                    wm = MyShortCut.objects.filter(id=comment.id)
+                    wm_comment = CommentForShortCut.objects.create(
+                        author=request.user,
+                        title=comment.title,
+                        shortcut=myshortcut,
+                        content=comment.content,
+                        created_at=comment.created_at,
+                    )
+
+    return JsonResponse({
+        'message': "부분 복사 test success",
+    })
+
+def partial_delete_btn_for_user(request):
+    writer_start = request.POST['writer_start']
+    writer_end = request.POST['writer_end']
+    # user_start = request.POST['user_start']
+    # user_end = request.POST['user_end']
+    writer_name = request.POST['writer_name']    
+    writer_array = [i for i in range(int(writer_start), int(writer_end) + 1)]    
+    
+    print("partial rang : ", writer_start, writer_end)
+    
+    for original_ca_id in writer_array:
+        original_ca_for_update = "ca"+str(original_ca_id)        
+        result_for_category_update = CategoryNick.objects.filter(Q(author=request.user.id)).update(**{original_ca_for_update: original_ca_for_update})        
+        MyShortCut.objects.filter(Q(author=request.user) & Q(category=original_ca_id)).delete()            
+    
+    return JsonResponse({
+        'message': "부분 삭제 success",
+    })    
+
+def partial_move_for_my_note(request):
+    # print("hi")
+    writer_start = request.POST['writer_start']
+    writer_end = request.POST['writer_end']
+    user_start = request.POST['user_start']
+    user_end = request.POST['user_end']
+    writer_name = request.POST['writer_name']
+    note_ower_obj = User.objects.get(username=writer_name)
+    # if (MyShortCut.objects.filter(Q(author=request.user)).count() != 0):
+    #     MyShortCut.objects.filter(Q(author=request.user)).delete()
+    #     # CategoryNick.objects.filter(Q(author=request.user)).delete()
+    # CommentForShortCut.objects.filter(Q(author=request.user)).delete()
+
+    print("partial rang : ", writer_start, writer_end, user_start, user_end)
+    
+    # 범위를 리스트로 만들기 [1,2,3,4..]
+    writer_array = [i for i in range(int(writer_start), int(writer_end) + 1)]    
+    user_array = [i for i in range(int(user_start), int(user_end) + 1)]
+    ca_array = ["ca"+str(i) for i in range(int(writer_start), int(writer_end) + 1)]
+   
+    # 각각의 범위 앞 숫자를 가져온뒤 차이를 계산
+    min_writer_ca_num = int(writer_array[0])
+    min_user_ca_num = int(user_array[0])
+  
+    print("writer_array : ", writer_array)
+    print("user_array : ", user_array)
+    # writer 가 본인일때는 필요 없음
+    print("writer_name : ", writer_name)
+    
+    for index, original_ca_id in enumerate(writer_array):
+        destination_ca_id = user_array[index]
+        original_ca_for_update = "ca"+str(original_ca_id)                
+        destination_ca_for_update = "ca"+str(index+1)                
+        print(original_ca_id, user_array[index])
+        
+        category_nick_list_obj = CategoryNick.objects.get(Q(author=note_ower_obj))
+        category_title_for_update = getattr(category_nick_list_obj, original_ca_for_update)
+
+        print("category_title_for_update : ", category_title_for_update)
+        print("original_ca_for_update : ", original_ca_for_update)
+        
+        update_result = MyShortCut.objects.filter(category=original_ca_id, author=request.user).update(category=destination_ca_id)
+        canick_update_result2 = CategoryNick.objects.filter(Q(author=request.user.id)).update(**{original_ca_for_update: original_ca_for_update})        
+        canick_update_result1 = CategoryNick.objects.filter(Q(author=request.user.id)).update(**{destination_ca_for_update: category_title_for_update})        
+        
+        print("canick_update_result2 : ", canick_update_result2)
+        print("update result : ", update_result)
+
+    return JsonResponse({
+        'message': "부분 이동 success",
+    })
+
+
+def delete_common_subject(request):
+    user = request.user.username
+    cs_id = request.POST.get('cs_id', '')
+
+
+    if request.method == "POST" and request.is_ajax():
+        gb = CommonSubject.objects.filter(Q(id=cs_id)).delete()
+        print('CommonSubject Delete 성공 : ', cs_id)
+        return JsonResponse({
+            'message': 'CommonSubject 삭제 성공 ',
+        })
+    else:
+        return redirect('/wm/myshorcut/')
+
+
+def partial_copy_for_skilnote(request):
+    # print("hi")
+    writer_start = request.POST['writer_start']
+    writer_end = request.POST['writer_end']
+    user_start = request.POST['user_start']
+    user_end = request.POST['user_end']
+    writer_name = request.POST['writer_name']
+
+    note_ower_obj = User.objects.get(username=writer_name)
+
+    if (MyShortCut.objects.filter(Q(author=request.user)).count() != 0):
+        MyShortCut.objects.filter(Q(author=request.user)).delete()
+        # CategoryNick.objects.filter(Q(author=request.user)).delete()
+    CommentForShortCut.objects.filter(Q(author=request.user)).delete()
+
+    print("partial rang : ", writer_start, writer_end, user_start, user_end)
+
+    writer_array = [i for i in range(int(writer_start), int(writer_end) + 1)]    
+    user_array = [i for i in range(int(user_start), int(user_end) + 1)]
+    
+    min_writer_ca_num = int(writer_array[0])
+    min_user_ca_num = int(user_array[0])
+    distance = min_writer_ca_num - min_user_ca_num
+    
+    # distance = int(writer_array[0]) - int(user_array[0])
+    ca_array = ["ca"+str(i) for i in range(int(writer_start), int(writer_end) + 1)]
+    
+    print("writer_array : ", writer_array)
+    print("user_array : ", user_array)
+    print("writer_name : ", writer_name)
+    # print("ca_array : ", ca_array)
+
+    # CategoryNick.objects.filter(Q(author=request.user)).delete()
+
+    category_list_obj = CategoryNick.objects.filter(Q(author=note_ower_obj))
+    print("category_list_obj : ", category_list_obj)
+    
+    for ca in ca_array:   
+        ca_obj = CategoryNick.objects.get(Q(author=note_ower_obj))
+        category_title = getattr(ca_obj, ca)                       
+        print("category_title : ", category_title)
+        print("count : ", CategoryNick.objects.filter(Q(author=request.user)).count())
+        
+        original_ca_num = int(ca[2:5])
+        # print("writer_note_obj : ", writer_note_obj)
+        # print("check !!!!!!!!!!!! : " , note.category.slug[2:5])
+        print("distance ::::::::::::::::::::::::: ", distance)
+        
+        # ca_for_update1 = "ca"+str(original_ca_num)  
+        ca_for_update = "ca"+str(original_ca_num -  distance)  
+        
+        print("ca_for_update 5555555555555555555555555 ", ca_for_update)    
+
+        # result_for_ca_update1 = CategoryNick.objects.filter(Q(author=request.user.id)).update(**{ca_for_update1: ca_for_update1})        
+        result_for_ca_update2 = CategoryNick.objects.filter(Q(author=request.user.id)).update(**{ca_for_update: category_title})        
+        print("result_for_ca_update2 : ", result_for_ca_update2)
+
+    writer_comment_list_obj = CommentForShortCut.objects.filter(
+        Q(author=note_ower_obj.id))
+    print("writer_comment_list_obj : ", writer_comment_list_obj.count())
+
+    for ca_id in writer_array:
+        print(ca_id)
+        writer_note_obj = MyShortCut.objects.filter(category=ca_id, author=note_ower_obj).order_by('created')
+
+        # [1,2] => [3,4]
+        # [3,4] => [1,2]
+        for note in writer_note_obj:
+            original_ca_num = int(note.category.slug[2:5])
+            print("writer_note_obj : ", writer_note_obj)
+            print("check !!!!!!!!!!!! : " , note.category.slug[2:5])
+            print("distance ::::::::::::::::::::::::: ", distance)
+            ca_number_for_update = original_ca_num -  distance
+            ca_obj_for_create = Category.objects.get(slug="ca"+str(ca_number_for_update)) # 차이만큼 빼준 category 를 적용
+            # if(distance > 0 ):  # 기존 카테고리가 더 클 경우 
+            # else: # 반대일 경우 즉 distance 가 - 일 경우 
+            #     ca_number_for_update = original_ca_num -  distance
+            #     print("ca_number_for_update check 2222222222222222222222222222222222: ", ca_number_for_update)
+            #     ca_obj_for_create = Category.objects.get(slug="ca"+str(ca_number_for_update))                   
+            
+            print("ca_obj_for_create : ", ca_obj_for_create)
+            myshortcut = MyShortCut.objects.create(
+                author=request.user,
+                title=note.title,
+                content1=note.content1,
+                content2=note.content2,
+                type_id=note.type_id,
+                category=ca_obj_for_create,
+                filename=note.filename,
+                image=note.image,
+                created=note.created,
+            )
+            for comment in writer_comment_list_obj:
+                if comment.shortcut.id == note.id:
+                    # print("댓글 생성 시도 확인")
+                    wm = MyShortCut.objects.filter(id=comment.id)
+                    wm_comment = CommentForShortCut.objects.create(
+                        author=request.user,
+                        title=comment.title,
+                        shortcut=myshortcut,
+                        content=comment.content,
+                        created_at=comment.created_at,
+                    )
+
+    return JsonResponse({
+        'message': "부분 복사 test success",
+    })
+
+
+def delete_common_subject(request):
+    user = request.user.username
+    cs_id = request.POST.get('cs_id', '')
+
+
+    if request.method == "POST" and request.is_ajax():
+        gb = CommonSubject.objects.filter(Q(id=cs_id)).delete()
+        print('CommonSubject Delete 성공 : ', cs_id)
+        return JsonResponse({
+            'message': 'CommonSubject 삭제 성공 ',
+        })
+    else:
+        return redirect('/wm/myshorcut/')
+
+def update_for_common_subject(request):
+    print("update_plan 실행 확인")
+
+    user = request.user
+    if request.method == "POST" and request.is_ajax():
+        common_subject_id = request.POST.get('common_subject_id', '')
+        common_subject = request.POST.get('common_subject', '')
+        
+        print("common_subject_id : ", common_subject_id)
+        print("common_subject : ", common_subject)
+        
+        common_subject_obj = CommonSubject.objects.filter(id=common_subject_id).update(
+            subject=common_subject
+        )
+        print('Lecture update Success !!!!!!!!!')
+        return JsonResponse({
+            'message': 'Plan Update Success',
+            'common_subject_id':common_subject_id,
+            'common_subject_subject':common_subject,
+            'common_subject_author':request.user.username
+        })
+    else:
+        return redirect('/todo')
+
+
+# insert_for_common_subject
+# insert_for_lecture_list
+def insert_for_common_subject(request):
+    print("insert_for_lecture_list 실행")
+    common_subject = request.POST['common_subject']
+
+    common_subject_obj = CommonSubject.objects.create(
+        author = request.user,
+        subject = common_subject
+    )
+
+    print("common_subject_obj : ", common_subject_obj.author)
+    print("common_subject_obj : ", common_subject_obj.subject)
+    print("common_subject_obj : ", common_subject_obj.id)
+    # print("plan_end_time : ", my_plan.end_time)
+    # print("plan_start_ca : ", my_plan.start_ca)
+
+    return JsonResponse({
+        'message': 'common_subject 추가 성공',
+        "common_subject_id":common_subject_obj.id,
+        "common_subject_author":common_subject_obj.author.username,
+        "common_subject_subject":common_subject_obj.subject,
+        
+    })
+
+
+def user_list_for_common_subject(request, cs_id):
+    
+    cs_obj = CommonSubject.objects.get(id=cs_id)
+    print("cs_obj : ", cs_obj)
+    
+    if request.method == 'GET':
+        user_list = User.objects.filter(profile__common_subject=cs_obj)
+        print("user_list : ", user_list)
+
+        return render(request, 'wm/user_list_for_common_subject.html', {
+            "user_list": user_list,
+        })
+    else:
+        return HttpResponse("Request method is not a GET")    
+
+def common_subject_list(request):
+    if request.method == 'GET':
+        object_list = CommonSubject.objects.all().order_by('created_at')
+        print("object_list : ", object_list)
+
+        return render(request, 'wm/common_subject_list.html', {
+            "object_list": object_list,
+        })
+    else:
+        return HttpResponse("Request method is not a GET")
+
+
+
+def delete_lecture_list(request, lecture_id):
+    user = request.user.username
+
+    if request.method == "POST" and request.is_ajax():
+        gb = LectureBookMark.objects.filter(Q(id=lecture_id)).delete()
+        print('MyPlan Delete 성공 : ', lecture_id)
+        return JsonResponse({
+            'message': 'my plan 삭제 성공 ',
+        })
+    else:
+        return redirect('/wm/myshorcut/')
+
+def update_lecture_bookmark(request):
+    print("update_plan 실행 확인")
+
+    user = request.user
+    if request.method == "POST" and request.is_ajax():
+        lecture_id = request.POST.get('lecture_id', '')
+        lecture_title = request.POST.get('lecture_title', '')
+        lecture_url = request.POST.get('lecture_url', '')
+        
+        print("lecture_id : ", lecture_id)
+        print("lecture_title : ", lecture_title)
+        print("lecture_url : ", lecture_url)
+        
+        my_lecture_bookmark = LectureBookMark.objects.filter(id=lecture_id).update(
+            title=lecture_title,
+            lecture_url=lecture_url,
+        )
+        print('Lecture update Success !!!!!!!!!')
+        return JsonResponse({
+            'message': 'Plan Update Success',
+            'lecture_title':lecture_title,
+            'lecture_url':lecture_url
+        })
+    else:
+        return redirect('/todo')
+
+
+# insert_for_lecture_list
+def insert_for_lecture_list(request):
+    print("insert_for_lecture_list 실행")
+    lecture_title = request.POST['lecture_title']
+
+    my_lecture = LectureBookMark.objects.create(
+        author = request.user,
+        title =lecture_title
+    )
+
+    print("author : ", my_lecture.author)
+    print("lecture_title : ", my_lecture.title)
+    print("lecture_id : ", my_lecture.id)
+    # print("plan_end_time : ", my_plan.end_time)
+    # print("plan_start_ca : ", my_plan.start_ca)
+
+    return JsonResponse({
+        'message': 'my_lecture row 추가 성공',
+        "lecture_id":my_lecture.id,
+        "lecture_author":my_lecture.author.username,
+        "lecture_title":my_lecture.title,
+        "lecture_created_at": my_lecture.created_at,
+        "lecture_url": my_lecture.lecture_url
+    })
+
+
+def lecture_list_for_user(request):
+    if request.method == 'GET':
+        print("geust_book_list 실행")
+        owner = User.objects.get(username=request.user.username)
+        object_list = LectureBookMark.objects.filter(author=owner).order_by('created_at')
+        print("object_list : ", object_list)
+
+        return render(request, 'wm/lecture_list.html', {
+            "object_list": object_list,
+        })
+    else:
+        return HttpResponse("Request method is not a GET")
+
+def delete_plan_list(request, plan_id):
+    user = request.user
+
+    if request.method == "POST" and request.is_ajax():
+        gb = MyPlan.objects.filter(Q(id=plan_id)).delete()
+        print('MyPlan Delete 성공 : ', plan_id)
+        return JsonResponse({
+            'message': 'my plan 삭제 성공 ',
+        })
+    else:
+        return redirect('/wm/myshorcut/')
+
+
+
+def insert_plan(request):
+    print("insert_for_guest_book 실행")
+    plan_content = request.POST['plan_content']
+
+    my_plan = MyPlan.objects.create(
+        owner_for_plan =request.user,
+        plan_content =plan_content
+    )
+
+    print("plan_content : ", my_plan.plan_content)
+    print("plan_start_time : ", my_plan.start_time)
+    print("plan_end_time : ", my_plan.end_time)
+    print("plan_start_ca : ", my_plan.start_ca)
+    print("plan_end_ca : ", my_plan.end_ca)
+
+    return JsonResponse({
+        'message': 'guest_book row 추가 성공',
+        "plan_content":my_plan.plan_content,
+        "plan_start_time":my_plan.start_time,
+        "plan_end_time":my_plan.end_time,
+        "plan_start_ca":my_plan.start_ca,
+        "plan_end_ca":my_plan.end_ca,
+        "owner_for_plan":my_plan.owner_for_plan.username,
+    })
+    
+def update_plan(request):
+    print("update_plan 실행 확인")
+
+    user = request.user
+    if request.method == "POST" and request.is_ajax():
+        plan_id = request.POST.get('plan_id', '')
+        plan_content = request.POST.get('plan_content', '')
+        plan_start_ca = request.POST.get('plan_start_ca', '')
+        plan_end_ca = request.POST.get('plan_end_ca', '')
+        plan_end_time = datetime.now()
+        
+        print("plan_id : ", plan_id)
+        print("plan_content : ", plan_content)
+        print("plan_start_ca : ", plan_start_ca)
+        print("plan_end_ca : ", plan_end_ca)
+        
+        plan = MyPlan.objects.filter(id=plan_id).update(
+            plan_content=plan_content,
+            start_ca=plan_start_ca,
+            end_ca=plan_end_ca,
+            end_time = plan_end_time
+        )
+        print('Plan update Success !!!!!!!!!')
+        return JsonResponse({
+            'message': 'Plan Update Success',
+            'end_time': plan_end_time
+        })
+    else:
+        return redirect('/todo')
+
+def update_plan_complete(request):
+    print("update_plan_complete 실행 확인")
+    
+    user = request.user
+    if request.method == "POST" and request.is_ajax():
+        plan_id = request.POST.get('plan_id', '')
+        plan_completed = request.POST.get('plan_completed', '')
+        plan_end_time = datetime.now()
+        
+        print("plan_id : ", plan_id)
+        print("plan_completed : ", plan_completed)
+        print("user : ", user)
+        
+        plan = MyPlan.objects.filter(id=plan_id).update(
+            completed=plan_completed,
+            end_time = plan_end_time
+        )
+        print('Plan update Success !!!!!!!!!')
+        return JsonResponse({
+            'message': 'Plan Update Success',
+            "end_time": datetime.now()
+        })
+    else:
+        return redirect('/todo')
+
+
+def supllement_explain(request, user_id, category):
+    print("supllement_explain 실행 확인")
+    print("user_id : ", user_id)
+    print("category : ", category)
+
+    return render(request, 'wm/supplement_explain.html', {
+        "user_id": user_id,
+    })
+
 
 def joinForOtherMemberNote(request):
     if request.method == "POST" and request.is_ajax():
         note_owner = request.POST['note_owner']
-        member = request.POST['member']    
+        member = request.POST['member']
         print("note_owner : ", note_owner)
         print("member : ", member)
-        
-        note_ower_obj = User.objects.get(username=note_owner)    
-    
-        existing_user = AllowListForSkilNote.objects.filter(note_owner=note_ower_obj , member = member).count()
+
+        note_ower_obj = User.objects.get(username=note_owner)
+
+        existing_user = AllowListForSkilNote.objects.filter(
+            note_owner=note_ower_obj, member=member).count()
         print("existing_user : ", existing_user)
-        
+
         if(existing_user >= 1):
             return JsonResponse({
                 'message': request.user.username + '님은 이미 가입 했습니다',
-            })  
-        
-        allow_row = AllowListForSkilNote(note_owner=note_ower_obj, member=member)        
+            })
+
+        allow_row = AllowListForSkilNote(
+            note_owner=note_ower_obj, member=member)
         allow_row.save()
-        
+
         print("allow_row : ", allow_row)
-        
+
         return JsonResponse({
             'message': '가입 신청 성공',
             'note_id': allow_row.id,
-            'note_owner' : note_owner,
-            'note_member' : member,
-            'note_permission' : "no"
-        })     
-        
+            'note_owner': note_owner,
+            'note_member': member,
+            'note_permission': "no"
+        })
+
+
 def cancleForOtherMemberNote(request):
     if request.method == "POST" and request.is_ajax():
         note_owner = request.POST['note_owner']
-        member = request.POST['member']    
+        member = request.POST['member']
         print("note_owner : ", note_owner)
         print("member : ", member)
-        
+
         note_ower_obj = User.objects.get(username=note_owner)
-    
-        allow_row = AllowListForSkilNote.objects.get(note_owner=note_ower_obj, member=member)
+
+        allow_row = AllowListForSkilNote.objects.get(
+            note_owner=note_ower_obj, member=member)
         delete_id = allow_row.id
         allow_row.delete()
-        
+
         print("allow_list : ", allow_list)
-        
+
         return JsonResponse({
             'message': '탈퇴 성공',
             'delete_id': delete_id
             # 'note_owner' : note_owner,
             # 'note_member' : member,
             # 'note_permission' : "no"
-        })     
-           
+        })
+
 
 def update_for_permission(request):
     user = request.user
     note_owner = request.POST['note_owner']
     member = request.POST['member']
-    
+
     note_ower_obj = User.objects.get(username=note_owner)
 
-    current_permission = AllowListForSkilNote.objects.get(Q(note_owner=note_ower_obj, member=member)).permission
+    current_permission = AllowListForSkilNote.objects.get(
+        Q(note_owner=note_ower_obj, member=member)).permission
     changed_permission = "no" if current_permission == True else "yes"
 
     print("changed_permission : ", changed_permission)
@@ -104,21 +701,22 @@ def update_for_permission(request):
     else:
         return redirect('/todo')
 
+
 def update_for_start(request):
     user = request.user
     note_owner = request.POST['note_owner']
     member = request.POST['member']
     start_at = request.POST['start_at']
     # end_at = request.POST['end_at']
-    
+
     print("start_at : ", start_at)
     # print("end_at : ", end_at)
-    
-    note_ower_obj = User.objects.get(username=note_owner)    
-    
+
+    note_ower_obj = User.objects.get(username=note_owner)
 
     if request.method == "POST" and request.is_ajax():
-        result = AllowListForSkilNote.objects.filter(Q(note_owner=note_ower_obj, member=member)).update(start_at=start_at)
+        result = AllowListForSkilNote.objects.filter(
+            Q(note_owner=note_ower_obj, member=member)).update(start_at=start_at)
         # result = AllowListForSkilNote.objects.filter(Q(note_owner=note_ower_obj, member=member)).update(end_at=end_at)
         print('AllowListForSkilNote permission update 성공 : ', result)
         return JsonResponse({
@@ -127,21 +725,22 @@ def update_for_start(request):
         })
     else:
         return redirect('/todo')
-    
+
+
 def update_for_end(request):
     user = request.user
     note_owner = request.POST['note_owner']
     member = request.POST['member']
     # start_at = request.POST['start_at']
     end_at = request.POST['end_at']
-    
+
     # print("start_at : ", start_at)
     print("end_at : ", end_at)
-    note_ower_obj = User.objects.get(username=note_owner)    
-    
+    note_ower_obj = User.objects.get(username=note_owner)
 
     if request.method == "POST" and request.is_ajax():
-        result = AllowListForSkilNote.objects.filter(Q(note_owner=note_ower_obj, member=member)).update(end_at=end_at)
+        result = AllowListForSkilNote.objects.filter(
+            Q(note_owner=note_ower_obj, member=member)).update(end_at=end_at)
         # result = AllowListForSkilNote.objects.filter(Q(note_owner=note_ower_obj, member=member)).update(end_at=end_at)
         print('AllowListForSkilNote permission update 성공 : ', result)
         return JsonResponse({
@@ -149,7 +748,8 @@ def update_for_end(request):
             # 'end_at': end_at,
         })
     else:
-        return redirect('/todo')    
+        return redirect('/todo')
+
 
 class allow_list(ListView):
     paginate_by = 10
@@ -162,11 +762,13 @@ class allow_list(ListView):
         return ['wm/_allow_list.html']
 
     def get_queryset(self):
-        note_owner = User.objects.get(username = self.kwargs['skilnote_owner'])
-        
-        object_list = AllowListForSkilNote.objects.filter(Q(note_owner=note_owner))
-        
-        self.login_user_join_status = object_list.filter(Q(member = self.request.user.username)).exists()
+        note_owner = User.objects.get(username=self.kwargs['skilnote_owner'])
+
+        object_list = AllowListForSkilNote.objects.filter(
+            Q(note_owner=note_owner))
+
+        self.login_user_join_status = object_list.filter(
+            Q(member=self.request.user.username)).exists()
 
         print("self.login_user_join_status : ", self.login_user_join_status)
 
@@ -175,7 +777,7 @@ class allow_list(ListView):
 
     def get_context_data(self, *, object_list=None, **kwargs):
         context = super(allow_list, self).get_context_data(**kwargs)
-        
+
         context['note_owner'] = self.kwargs['skilnote_owner']
         context['login_user_join_status'] = self.login_user_join_status
         return context
@@ -183,29 +785,26 @@ class allow_list(ListView):
 
 # 0117
 
-class main_page(LoginRequiredMixin , ListView):
-    model=User
+class main_page(LoginRequiredMixin, ListView):
+    model = User
     paginate_by = 10
-    # if 'q' in request.GET:
-    #     query = request.GET.get('q')
-    #     print("query : ", query)
 
     def get_template_names(self):
         if self.request.is_ajax():
             print("user list ajax 요청 확인")
-            return ['wm/main_page.html']
+            return ['wm/.html']
         return ['wm/main_page.html']
 
     def get_queryset(self):
         print("실행 확인 겟 쿼리셋")
         query = self.request.GET.get('q')
         print("query : ", query)
-        object_list = User.objects.all().filter(profile__public="True").order_by('-profile__click_count')
+        object_list = User.objects.all().filter(
+            profile__public="True").order_by('-profile__click_count')
         print("result : ", object_list)
         return object_list
 
 
-# 1122
 def manualPage(request):
     return render(request, 'wm/manual.html', {
     })
@@ -310,20 +909,25 @@ class MyShortcutListByCategory2(ListView):
         return context
 
 
-def guest_book_list(request, guest_book_owner):
+def plan_list_for_user(request, plan_user):
     if request.method == 'GET':
-        print("geust_book_list 실행")
-        owner = User.objects.get(username=guest_book_owner)
+        print("plan_list_for_user 실행")
+        owner = User.objects.get(username=plan_user)
+        
+        print("owner : ", owner)
 
-        object_list = GuestBook.objects.filter(
-            owner_for_guest_book=owner).order_by('created_at')
+        object_list = MyPlan.objects.filter(
+            owner_for_plan=owner).order_by('start_time')
         print("object_list : ", object_list)
 
-        return render(request, 'wm/guest_book_list.html', {
+        return render(request, 'wm/plan_list.html', {
             "object_list": object_list,
         })
     else:
         return HttpResponse("Request method is not a GET")
+
+
+
 
 
 def insert_temp_skill_note_for_textarea(request):
@@ -355,8 +959,8 @@ def delete_guest_book_list(request, id):
     user = request.user
 
     if request.method == "POST" and request.is_ajax():
-        gb = GuestBook.objects.filter(Q(id=id)).delete()
-        print('GuestBook delete 성공 id : ', id)
+        gb = LectureBookMark.objects.filter(Q(id=id)).delete()
+        print('LectureBookMark delete 성공 id : ', id)
         return JsonResponse({
             'message': 'comment 삭제 성공 ',
         })
@@ -371,7 +975,7 @@ def insert_for_guest_book(request):
     user = request.POST['page_user']
     text = request.POST['text']
 
-    guest_book = GuestBook.objects.create(
+    guest_book = LectureBookMark.objects.create(
         owner_for_guest_book=request.user,
         author=request.user,
         content=text,
@@ -448,7 +1052,8 @@ class MyShortcutListByUser(ListView):
         print("user : ", user)
         # 0113
         try:
-            allowed_for_current_user = AllowListForSkilNote.objects.get(Q(note_owner=user, member=self.request.user.username))
+            allowed_for_current_user = AllowListForSkilNote.objects.get(
+                Q(note_owner=user, member=self.request.user.username))
         except:
             print("쿼리 없음")
             allowed_for_current_user = "False"
@@ -457,21 +1062,20 @@ class MyShortcutListByUser(ListView):
         if(allowed_for_current_user != "False"):
             if(allowed_for_current_user.permission == True):
                 self.allowed_for_current_user = True
-                
+
                 # 만약 현재 접속하려는 ca 숫자가 AllowListForSkilNoted의 start_at 과 end_at 사이가 아닐 경우
-                # allowed_for_current_user false 
+                # allowed_for_current_user false
                 if(allowed_for_current_user.start_at <= category_id and allowed_for_current_user.end_at >= category_id):
                     self.allowed_for_current_user = True
                 else:
-                    self.allowed_for_current_user = False                
-                
+                    self.allowed_for_current_user = False
+
             else:
                 self.allowed_for_current_user = False
         else:
             self.allowed_for_current_user = False
 
         print("allowed_for_current_user : ", allowed_for_current_user)
-
 
         print("category_id : ", category_id)
         # update
@@ -679,7 +1283,66 @@ def plus_recommand_for_skillnote_user(request):
         })
 
 
+def copy_chapter_to_x(request):
+    owner = request.POST['owner']
+    category = request.POST['category']
+    index = request.POST['index']
+    destination_chapter = request.POST['destination_chapter']
+    category_title = request.POST['category_title']
+
+    owner_user = User.objects.get(username=owner)
+
+    print("category 11: ", category)
+
+    list_for_chapter_copy = MyShortCut.objects.filter(
+        Q(author=owner_user) & Q(category=index))
+    comment_for_chapter_copy = CommentForShortCut.objects.filter(
+        Q(author=owner_user))
+    print("list_for_chapter_copy : ", list_for_chapter_copy)
+
+    CategoryNick.objects.filter(Q(author=request.user)).update(
+        **{"ca"+destination_chapter: category_title})
+
+    # if(request.user.username != owner):
+    #     MyShortCut.objects.filter(Q(author=request.user) & Q(category = index)).delete()
+
+    ca = Category.objects.get(id=destination_chapter)
+
+    for p in list_for_chapter_copy:
+        myshortcut = MyShortCut.objects.create(
+            author=request.user,
+            title=p.title,
+            content1=p.content1,
+            content2=p.content2,
+            type_id=p.type_id,
+            category=ca,
+            filename=p.filename,
+            image=p.image,
+            created=p.created,
+        )
+        # print("myshortcut : " , myshortcut.id)
+        for comment in comment_for_chapter_copy:
+            # print("comment.id : ", comment.id)
+            # print("myshortcut.id : ", myshortcut.id )
+            if comment.shortcut.id == p.id:
+                print("댓글 생성 시도 확인")
+                wm = MyShortCut.objects.filter(id=comment.id)
+                wm_comment = CommentForShortCut.objects.create(
+                    author=request.user,
+                    title=comment.title,
+                    shortcut=myshortcut,
+                    content=comment.content,
+                    created_at=comment.created_at,
+                )
+
+    print("챕터 복사 버튼 클릭", owner, category, index)
+    return JsonResponse({
+        'message': owner + '의 노트 ' + category + '를 ' + destination_chapter + '로 복사 했습니다'
+    })
+
 # MyShortCut , CommentForShortCut, CategoryNick
+
+
 def copy_to_me_from_user_id(request):
 
     author = request.POST['author']
@@ -1700,7 +2363,8 @@ class user_list_for_memo_view(ListView):
         else:
             print(
                 "user list 출력 확인 ===========================================================")
-            object_list = User.objects.all().filter(profile__public="True").order_by('-profile__skill_note_reputation')
+            object_list = User.objects.all().filter(
+                profile__public="True").order_by('-profile__skill_note_reputation')
             print("result : ", object_list)
             return object_list
 
@@ -1783,9 +2447,17 @@ def CategoryNickListByUserId_for_user(request, user_name):
         cn_my = CategoryNick.objects.get(author=user.id)
         print("cn_my : ", cn_my)
 
+        column_list = []
+
+        for i in range(1, 121):
+            field_name = "ca" + str(i)
+            column_list.append(getattr(cn_my, field_name))
+
         return render(request, 'wm/categorynick_list_for_user.html', {
             "category": cn_my,
-            "page_user": user_name
+            "column_list": column_list,
+            "page_user": user_name,
+            "range": range(1, 120)
         })
     else:
         return HttpResponse("Request method is not a GET")
@@ -2070,7 +2742,8 @@ class user_list_for_login_page(ListView):
         else:
             print(
                 "user list 출력 확인 ===========================================================")
-            object_list = User.objects.all().filter(profile__public="True").order_by('-profile__click_count')
+            object_list = User.objects.all().filter(
+                profile__public="True").order_by('-profile__click_count')
             print("result : ", object_list)
             return object_list
 

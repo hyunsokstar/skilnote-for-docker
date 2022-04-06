@@ -1,4 +1,5 @@
 {% load static %}
+
 <style>
   table,
   td,
@@ -30,10 +31,15 @@
   .login_user_row {
     background-color: azure;
   }
+
+
 </style>
 
-<div class="table-responsive">
+<br><br>
 
+<h2>참가자 목록</h2>
+<div class="table-responsive">
+  
   <table class="">
     <tr style="background-color: #edf3fa">
       <td>user</td>
@@ -53,25 +59,45 @@
       <td id="user_name_{{u.id}}">
         <a href="http://www.skilnote-for-jpa.co.kr/wm/myshortcut/{{u.username}}/1" title="{{u.profile.phone}}">
           {{u.username}}
+
+
+            &nbsp;
+            <a href="" class="btn btn-outline-success btn-sm" data-id="{{u.id}}" id="{{u.username}}">
+              북마크
+            </a>
+            <a href="" class="btn btn-outline-success btn-sm" data-id="{{u.id}}" id="{{u.username}}">
+              북마크
+            </a>
+    
+
         </a>
         
       </td>
 
       <td>
         {% if u.profile.lecture_url %}
-        <a href="http://{{u.profile.lecture_url}}">
+        <a class="btn btn-outline-dark btn-sm" href="http://{{u.profile.lecture_url}}">
           <img src="{% static 'icon/home_page.png' %}" width="%" alt="" />
         </a>
         {% elif not u.profile.lecture_url %}
-        <img src="{% static 'icon/home_page_empty.png' %}" width="%" alt="" />
-        {% endif %} {% if u.profile.github_original %}
-        <a href="http://{{u.profile.github_original}}">
+        <a class="btn btn-outline-dark btn-sm" href="http://{{u.profile.github_original}}">
+          <img src="{% static 'icon/home_page_empty.png' %}" width="%" alt="" />
+        </a>
+        {% endif %} 
+
+        {% if u.profile.github_original %}
+        <a class="btn btn-outline-dark btn-sm" href="http://{{u.profile.github_original}}">
           <img src="{% static 'icon/github_original.png' %}" width="%" alt="" />
         </a>
         {% elif not u.profile.github_original %}
-        <img src="{% static 'icon/github_empty.png' %}" width="%" alt="" />
+        <a href="" class="btn btn-outline-dark btn-sm" data-id="{{u.id}}" id="{{u.username}}">
+          <img src="{% static 'icon/github_empty.png' %}" width="%" alt="" />
+        </a>
+
 
         {% endif %}
+
+
       </td>
 
       <td>
@@ -80,13 +106,12 @@
           data-username="{{u.username}}">
           목록
         </button>
-        <button class="btn btn-sm btn-outline-dark">
-          <a href="http://www.skilnote-for-jpa.co.kr/wm/myshortcut/{{u.username}}/119">결과1</a>
+        <!-- <button class="btn btn-sm btn-outline-dark"> -->
+          <!-- <a href="http://www.skilnote-for-jpa.co.kr/wm/myshortcut/{{u.username}}/119">결과1</a>
         </button>
         <button class="btn btn-sm btn-outline-dark">
           <a href="http://www.skilnote-for-jpa.co.kr/wm/myshortcut/{{u.username}}/120">결과2</a>
-        </button>
-
+        </button> -->
       </td>
 
       <td>
@@ -279,7 +304,7 @@
 <!-- js area -->
 <script type="text/javascript">
 
-  {% block extra_js %}
+  {%block extra_js %}
 
   // 2244
   // showAllowListButton
@@ -363,5 +388,5 @@
       })
   });
 
-  {% endblock %}
+  {% endblock extra_js %}
 </script>

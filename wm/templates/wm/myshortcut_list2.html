@@ -50,6 +50,28 @@ button, input, a {
 	background-color:green
 }
 
+
+.header-box-for-input-mode {
+	width: 100%;;
+	<!-- height: 100px; -->
+	overflow:expand;
+	background-color: whitesmoke;
+	border: 1px solid blue;
+	margin-bottom:10px;
+	display:flex;
+}
+
+.header-box-for-input-mode .header-box-column {
+	flex:1;
+	padding-left: 4px;
+	<!-- border: 1px solid green; -->
+}
+
+.header-box-for-input-mode input[type=text] {
+	background-color: yellow;
+	width: 38px;
+}
+
 img.Image { max-width: 100%; display: block; }
 
 
@@ -60,8 +82,12 @@ img.Image { max-width: 100%; display: block; }
 
 <br><br><br>
 
-<h2>{{request.user}}의 Skil Note (입력 모드) &nbsp;&nbsp; CA: {{request.user.profile.selected_category_id}}</h2>
+<h4>{{request.user}}의 Skil Note (입력 모드) &nbsp;&nbsp; CA: {{request.user.profile.selected_category_id}}</h4>
 
+<!-- 편집 컴퍼넌트 -->
+{% include "./edit_component.html" %}
+
+<!-- wm input mode -->
 {% if messages %}
 <div class="alert alert-success">
 	{% for message in messages %}
@@ -123,7 +149,6 @@ img.Image { max-width: 100%; display: block; }
 				<button class="btn btn-outline-danger btn-sm shortcut_between_button_input" id="{{p.id}}">ip</button>
 				<button class="btn btn-outline-danger btn-sm shortcut_between_button_textarea" id="{{p.id}}">ta</button>
 				<button class="btn btn-outline-danger btn-sm input_beteween_image_for_skill_note_btn" id="{{p.id}}">pi</button>
-
 
 		</td>
 	</tr>
@@ -355,7 +380,7 @@ img.Image { max-width: 100%; display: block; }
 
 <div class="sideicon_for_scroll">
 
-	<button type="button" name="button" class="before_btn btn btn-outline-dark btn-sm" onclick="window.location.href = '{% url 'wm:my_shortcut_list' %}'">L</button><br>
+	<button type="button" name="button" class="read-mode btn btn-outline-dark btn-sm" onclick="window.location.href = '{% url 'wm:my_shortcut_list' %}'">L</button><br>
 	<a href="" class="btn btn-outline-primary btn-sm" id="insert_first_for_skill_note_btn"> 첫글</a><br>
 	<a href="" class="btn btn-outline-primary btn-sm" id="shortcut_delete_button "> 삭제 </a> <br>
 	<a href="" class="btn btn-outline-primary btn-sm" id="ca_plus_1_btn" data-category={{cateogory}}>
@@ -797,9 +822,7 @@ $(function() {
     if (e.ctrlKey && e.which === 39) {
 	  $(".go_to_next_channer_btn").trigger("click");
     }
-	if (e.altKey && e.which === 49) {
-	  $(".new3_btn").trigger("click");
-    }
+
 	if (e.altKey && e.which === 50) {
 	  $(".new1_btn").trigger("click");
 	}
@@ -809,11 +832,168 @@ $(function() {
 	if (e.altKey && e.which === 52) {
 	  $(".insert_image").trigger("click");
 	}
+
+	if (e.altKey && e.which === 49) {
+		console.log("리드 모드");
+	  $(".read-mode").trigger("click");
+    }
+
+	if (e.ctrlKey && e.which === 38) {
+	  $(".before_btn").trigger("click");
+	}
+	if (e.ctrlKey && e.which === 40) {
+	  $(".next_btn").trigger("click");
+	}
+
   })
 
   window.scrollTo(0,document.body.scrollHeight);
 
 });
+
+// 1111111111111111
+
+// partial_move_btn_for_user
+// form.addEventListener('focusout', (event) => {
+// 	alert("검사 실행")
+// });
+
+
+$('body').on('click', '.partial_copy_from_another_user', function (e) {
+	e.preventDefault();
+	
+	var partial_copy_option = $("input[name='partial_copy_option']:checked").val();
+	alert("partial_copy_option : "+ partial_copy_option)
+
+    const writer_start = $(this).parent().find(".writer_start").val();
+    const writer_end = $(this).parent().find(".writer_end").val();
+    const user_start = $(this).parent().find(".user_start").val();
+    const user_end = $(this).parent().find(".user_end").val();
+    const writer_name  = $(this).parent().find(".writer_id_input_for_copy").val();
+    let writer_rang = writer_end - writer_start
+    let user_rang = user_end - user_start
+
+    console.log("rang : ", writer_start, writer_end, user_start, user_end);
+    console.log("writer_rang : ", writer_rang);
+    console.log("user_rang : ", user_rang);
+    console.log("writer_name : ", writer_name);
+
+    if(writer_rang === user_rang){
+      console.log("부분 복사를 실행 하겠습니다");
+    } else {
+      alert("범위가 다르므로 복사를 취소 하겠습니다.");
+      return;
+    }
+
+    const yn = confirm(`부분 복사 (ca${writer_start} ~ ca${writer_end} => ca${user_start} ~ ca${user_end})  실행합니까? `, "");
+
+    if (yn) {
+            $.ajax({
+                type: "POST",
+                url: '/wm/myshortcut/partial_copy_for_skilnote_from_another_user',
+                data: {
+                  writer_start: writer_start,
+                  writer_end: writer_end,
+                  user_start: user_start,
+                  user_end:user_end,
+                  writer_name:writer_name,
+				  partial_copy_option: partial_copy_option,
+                  csrfmiddlewaretoken: '{{ csrf_token }}'
+                },
+                success: function (result) {
+                    alert(result.message);
+                }
+            });
+        } else {
+            alert("취소")
+        }
+	
+})
+
+$('body').on('click', '.partial_delete_btn_for_user', function (e) {
+    e.preventDefault();
+    const writer_start = $(this).parent().find(".writer_start").val();
+    const writer_end = $(this).parent().find(".writer_end").val();
+    // const user_start = $(this).parent().find(".user_start").val();
+    // const user_end = $(this).parent().find(".user_end").val();
+    const writer_name = $(this).data("username");
+	console.log("삭제 버튼 클릭");
+	console.log(writer_start,writer_end,writer_name);
+
+    let writer_rang = writer_end - writer_start
+    // let user_rang = user_end - user_start
+
+	const yn = confirm(`부분 복사 (ca${writer_start} ~ ca${writer_end}) 에 대한 삭제를 실행합니까? `, "");
+
+    if (yn) {
+            $.ajax({
+                type: "POST",
+                url: '/wm/myshortcut/partial_delete_btn_for_user',
+                data: {
+                  writer_start: writer_start,
+                  writer_end: writer_end,
+                //   user_start: user_start,
+                //   user_end:user_end,
+                  writer_name:writer_name,
+                  csrfmiddlewaretoken: '{{ csrf_token }}'
+                },
+                success: function (result) {
+                    alert(result.message);
+                }
+            });
+        } else {
+            alert("취소")
+        }	
+	
+});
+
+
+// edit_component.html
+$(document).on('click', '.partial_move_btn_for_user', function (e) {
+	// alert("부분 복사 버튼 클릭")
+    // console.log("부분 복사 버튼 클릭 확인")
+    e.preventDefault();
+    const writer_start = $(this).parent().find(".writer_start").val();
+    const writer_end = $(this).parent().find(".writer_end").val();
+    const user_start = $(this).parent().find(".user_start").val();
+    const user_end = $(this).parent().find(".user_end").val();
+    const writer_name = $(this).data("username");
+
+    let writer_rang = writer_end - writer_start
+    let user_rang = user_end - user_start
+	
+    if(writer_rang === user_rang){
+      console.log("부분 복사를 실행 하겠습니다");
+    } else {
+      alert("범위가 다르므로 복사를 취소 하겠습니다.");
+      return;
+    }		
+	// 입력값 확인
+	// console.log(writer_start,writer_end,user_start,user_end,writer_name);
+	const yn = confirm(`부분 복사 (ca${writer_start} ~ ca${writer_end} => ca${user_start} ~ ca${user_end})  실행합니까? `, "");
+
+    if (yn) {
+            $.ajax({
+                type: "POST",
+                url: '/wm/myshortcut/partial_move_for_my_note',
+                data: {
+                  writer_start: writer_start,
+                  writer_end: writer_end,
+                  user_start: user_start,
+                  user_end:user_end,
+                  writer_name:writer_name,
+                  csrfmiddlewaretoken: '{{ csrf_token }}'
+                },
+                success: function (result) {
+                    alert(result.message);
+                }
+            });
+        } else {
+            alert("취소")
+        }
+
+})
+
 
 // 2244
 $('body').on('click', '#change_user_id_to_me', function (e) {
@@ -1347,14 +1527,14 @@ $('body').on('click', '.shortcut_between_button_sn', function (e) {
 
 	$.ajax({
 		type: "POST",
-		url: 'new/textarea_summer_note_through2/'+current_article_id,
+		url: 'new/textarea_summer_note_through4/'+current_article_id,
 		data: {
 			'current_article_id': current_article_id,
 			csrfmiddlewaretoken: '{{ csrf_token }}'
 		},
 		success: function (result) {
 
-			window.history.pushState("", "", '/wm/new/textarea_summer_note_through2/'+current_article_id)
+			window.history.pushState("", "", '/wm/new/textarea_summer_note_through4/'+current_article_id)
 			// alert(result)
 			$(".summernote_content_for_popup").html(result);
 			$("#sumemr_note_popup").modal()
